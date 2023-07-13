@@ -1,151 +1,93 @@
 package main
 
+/*
+A very lightweight netflow alternative
+
+Version 1.0.2
+
+*/
 import (
 	"flag"
 	"fmt"
-	"net"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/cpuboi/netlite/tools"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 )
 
-type packetStruct struct {
-	srcIp   net.IP
-	dstIp   net.IP
-	srcPort int
-	dstPort int
-	proto   string
-}
+func getArgs() (string, bool, bool, string, int, bool, bool, bool, string) {
+	// This should handle alternative cache locations..
+	var inputInterface = flag.String("i", "", "network `interface name`")
+	var listDevices = flag.Bool("l", false, "list network interfaces")
 
-func errCheck(err error) {
-	if err != nil {
-		//panic(err)
-		fmt.Println("[x]", err)
+	var printHeader = flag.Bool("p", false, "print header")
+	var separatorCharacter = flag.String("s", "\t", "`separator` character")
+	var memoryLifetimeSeconds = flag.Int("r", 600, "reset memory after X `seconds`\nthe memory of seen sockets gets purged and previously seen connections will get logged again.")
+
+	var minimal = flag.Bool("m", false, "Show minimal output\n\tTimestamp is printed once followed by an increment of seconds for each connection\n\tProtocol is replaced by 0,1,2,3\n\t0=TCP, 1=UDP, 2=ICMP, 3=DNS, 4=NOT_IMPLEMENTED")
+	var portScanMode = flag.Bool("portscan-mode", false, "Show port scans, only show incoming non established traffic\nConnections initiated from your client will not show in output\nIf the interface has several addresses, the first one will get used")
+	var verbose = flag.Bool("v", false, "verbose mode")
+	var ipOverride = flag.String("ip-override", "", "If Netlite cant detect interface address, set it here")
+	flag.Parse()
+
+	if !*listDevices && *inputInterface == "" {
+		fmt.Fprintf(os.Stderr, "Select input device\n")
 		os.Exit(1)
 	}
-}
 
-func getArgs() (string, bool, bool, string, int) {
-	// This should handle alternative cache locations..
-	var inputDevice = flag.String("i", "", "Input device")
-	var listDevices = flag.Bool("l", false, "Input device")
-
-	var printHeader = flag.Bool("p", false, "Print header")
-	var separatorCharacter = flag.String("s", "	", "Separator character")
-	var memoryLifetimeSeconds = flag.Int("r", 600, "Reset interval of memory, after interval seconds the memory of seen units get purged and previously seen connections will get logged again.")
-	flag.Parse()
-	return *inputDevice, *listDevices, *printHeader, *separatorCharacter, *memoryLifetimeSeconds
-}
-
-func printPacketInfo(p *packetStruct, m map[string]bool, t int64, separatorCharacter string) {
-	//header := "sourceIp,sourcePort,destinationIp,destinationPort,protocol,timestamp"
-	// First check filter
-	// If packet contains IP addresses
-	if p.srcIp != nil {
-		if !tools.MiniFilter(p.srcIp.String(), p.srcPort, p.dstIp.String(), p.dstPort, m) { // If data not in memory print line print line
-			fmt.Println(p.srcIp.String() + separatorCharacter + strconv.Itoa(p.srcPort) + separatorCharacter + p.dstIp.String() + separatorCharacter + strconv.Itoa(p.dstPort) + separatorCharacter + p.proto + separatorCharacter + strconv.Itoa(int(t)))
-		} else {
-		}
-	}
-}
-
-func getPacketInfo(packet gopacket.Packet, p *packetStruct) {
-
-	ipLayer := packet.Layer(layers.LayerTypeIPv4)
-	if ipLayer != nil {
-		ip, _ := ipLayer.(*layers.IPv4)
-		p.srcIp = ip.SrcIP
-		p.dstIp = ip.DstIP
-	}
-
-	tcpLayer := packet.Layer(layers.LayerTypeTCP)
-	if tcpLayer != nil {
-		tcp, _ := tcpLayer.(*layers.TCP)
-		p.srcPort = int(tcp.SrcPort)
-		p.dstPort = int(tcp.DstPort)
-		p.proto = "TCP"
-	}
-
-	udpLayer := packet.Layer(layers.LayerTypeUDP)
-	if udpLayer != nil {
-		udp, _ := udpLayer.(*layers.UDP)
-		p.srcPort = int(udp.SrcPort)
-		p.dstPort = int(udp.DstPort)
-		p.proto = "UDP"
-	}
-
-	dnsLayer := packet.Layer(layers.LayerTypeDNS)
-	if dnsLayer != nil {
-		p.proto = "DNS"
-	}
-
-	icmpLayer := packet.Layer(layers.LayerTypeICMPv4)
-	if icmpLayer != nil {
-		p.proto = "ICMP"
-	}
-
+	return *inputInterface, *listDevices, *printHeader, *separatorCharacter, *memoryLifetimeSeconds, *minimal, *portScanMode, *verbose, *ipOverride
 }
 
 func main() {
 
 	var (
-		device       string        = ""
-		snapshot_len int32         = 100 // Only need header part of the frame
-		promiscuous  bool          = false
-		timeout      time.Duration = 100 * time.Millisecond
-		handle       *pcap.Handle
+		snapshotLen int32         = 1500 // Only need header part of the frame
+		promiscuous bool          = false
+		timeout     time.Duration = 100 * time.Millisecond
 	)
 
-	inputDevice, listDevices, printHeader, separatorCharacter, memoryLifetimeSeconds := getArgs()
+	inputInterface, listDevices, printHeader, separatorCharacter, memoryLifetimeSeconds, minimal, portScanMode, verbose, ipOverride := getArgs()
+
+	// list devices
 
 	if listDevices {
 		deviceList := make([]string, 1)
 		devices, err := pcap.FindAllDevs()
-		errCheck(err)
+		tools.ErrCheck(err)
 		for _, device := range devices {
 			deviceList = append(deviceList, device.Name)
 		}
-		fmt.Println("[-] Found devices:", deviceList)
+		fmt.Println("Found devices:", deviceList)
 		os.Exit(0)
 	}
 
-	if inputDevice == "" {
-		fmt.Println("[x] Select input device")
-		os.Exit(1)
-	} else {
-		device = inputDevice
-	}
+	var interfaceAddress string
+	// Get interface address
 
-	// Create memory hashmap
-	m := make(map[string]bool)
-	mapInitTime := time.Now().Unix()
-	// Create packet struct
-	p := packetStruct{}
+	interfaceAddress, err := tools.GetInterfaceIpv4Addr(inputInterface, ipOverride)
+	tools.ErrCheck(err)
 
-	// Capture packets
-	handle, err := pcap.OpenLive(device, snapshot_len, promiscuous, timeout)
-	errCheck(err)
-	defer handle.Close()
-
-	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
-	if printHeader {
-		header := "sourceIP" + separatorCharacter + "srcPort" + separatorCharacter + "destinationIP" + separatorCharacter + "dstPort" + separatorCharacter + "proto" + separatorCharacter + "timestamp"
-		fmt.Println(header)
-	}
-
-	for packet := range packetSource.Packets() {
-		t := time.Now().Unix()
-		if t-mapInitTime > int64(memoryLifetimeSeconds) { // Clear the map after memoryLifetimeSeconds so as to show previously logged connections.
-			m = make(map[string]bool)
-			mapInitTime = t // Store new map init time to compare to
+	if verbose {
+		fmt.Fprintf(os.Stderr, "Netlite started\n\nInterface:\t%s\nAddress:\t%s\n", inputInterface, interfaceAddress)
+		if portScanMode {
+			fmt.Fprintf(os.Stderr, "Portscan mode:\tenabled\n")
+		} else {
+			fmt.Fprintf(os.Stderr, "Portscan mode:\tdisabled\n")
 		}
-		getPacketInfo(packet, &p)
-		printPacketInfo(&p, m, t, separatorCharacter)
-
+		if minimal {
+			fmt.Fprintf(os.Stderr, "Minimal  mode:\tenabled\n")
+		} else {
+			fmt.Fprintf(os.Stderr, "Minimal  mode:\tdisabled\n")
+		}
+		fmt.Fprintf(os.Stderr, "\n")
 	}
+
+	// Print header
+	if printHeader {
+		tools.PrintHeader(portScanMode, separatorCharacter)
+	}
+
+	// Start capture
+	tools.StartCapture(inputInterface, snapshotLen, promiscuous, timeout, separatorCharacter, memoryLifetimeSeconds, minimal, portScanMode, interfaceAddress)
 }

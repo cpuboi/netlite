@@ -20,3 +20,5 @@ sudo apt-get install libpcap-dev
 Every IP:Port source destination pair gets stored in a simple database.  
 The pair only gets printed once.  
 Every 10 minutes (configurable) the database is reset and the unique IP:port pair are logged again.  
+
+If running in portscan mode then only incoming connection attempts are logged  
