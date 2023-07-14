@@ -11,7 +11,7 @@ func PrintHeader(portScanMode bool, separatorCharacter string) {
 	if portScanMode {
 		header = "SrcIP" + separatorCharacter + "DstPort" + separatorCharacter + "Proto" + separatorCharacter + "Timestamp"
 	} else {
-		header = "SrcIP" + separatorCharacter + "SrcPort" + separatorCharacter + "DstIP" + separatorCharacter + "DstPort" + separatorCharacter + "Proto" + separatorCharacter + "Timestamp"
+		header = "SrcIP" + separatorCharacter + "DstPort" + separatorCharacter + "Proto" + separatorCharacter + "Timestamp"
 	}
 	fmt.Println(header)
 }
