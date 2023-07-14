@@ -103,20 +103,24 @@ func StartCapture(inputInterface string, snapshotLen int32, promiscuous bool, ti
 			mapInitTime = timeNow // Update the reset timestamp
 		}
 
-		// If minimal then convert epoch to seconds since start of collection (to save space)
 		if minimal {
 			if minimalPrintedFirstTimestamp { // If the first packet has outputted full timestamp, then output seconds since start
 				timeNow = time.Now().Unix() - processStartTime
 			} else {
 				minimalPrintedFirstTimestamp = true
 			}
-
 		}
 
 		// Populate the packet struct
 		GetPacketInfo(packet, &pStruct, minimal)
 
+		// If minimal then convert epoch to seconds since start of collection (to save space)
+		if minimal {
+			timeNow = time.Now().Unix() - processStartTime
+		}
+
 		// Print packet information
 		PrintPacketInfo(&pStruct, memoryHashmap, blacklistHashmap, timeNow, separatorCharacter, minimal, portScanMode, interfaceAddress)
 	}
+
 }

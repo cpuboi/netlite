@@ -3,7 +3,7 @@ package main
 /*
 A very lightweight netflow alternative
 
-Version 1.0.3
+Version 1.0.4
 
 */
 import (
@@ -25,7 +25,7 @@ func getArgs() (string, bool, bool, string, int, bool, bool, bool, string) {
 	var separatorCharacter = flag.String("s", "\t", "`separator` character")
 	var memoryLifetimeSeconds = flag.Int("r", 600, "reset memory after X `seconds`\nthe memory of seen sockets gets purged and previously seen connections will get logged again.")
 
-	var minimal = flag.Bool("m", false, "Show minimal output\n\tTimestamp is printed once followed by an increment of seconds for each connection\n\tProtocol is replaced by 0,1,2,3\n\t0=TCP, 1=UDP, 2=ICMP, 3=DNS, 4=NOT_IMPLEMENTED")
+	var minimal = flag.Bool("m", false, "Show minimal output\n\tTimestamp is printed once in the header (if -p) followed by an increment of seconds for each connection\n\tProtocol is replaced by 0,1,2,3\n\t0=TCP, 1=UDP, 2=ICMP, 3=DNS, 4=NOT_IMPLEMENTED")
 	var portScanMode = flag.Bool("portscan-mode", false, "Show port scans, only show incoming non established traffic\nConnections initiated from your client will not show in output\nIf the interface has several addresses, the first one will get used")
 	var verbose = flag.Bool("v", false, "verbose mode")
 	var ipOverride = flag.String("ip-override", "", "If Netlite cant detect interface address, set it here")
@@ -85,7 +85,7 @@ func main() {
 
 	// Print header
 	if printHeader {
-		tools.PrintHeader(portScanMode, separatorCharacter)
+		tools.PrintHeader(portScanMode, separatorCharacter, minimal)
 	}
 
 	// Start capture

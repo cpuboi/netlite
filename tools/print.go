@@ -3,20 +3,28 @@ package tools
 import (
 	"fmt"
 	"strconv"
+	"time"
 )
 
 // Print the header
-func PrintHeader(portScanMode bool, separatorCharacter string) {
+func PrintHeader(portScanMode bool, separatorCharacter string, minimal bool) {
 	var header string
-	if portScanMode {
-		header = "SrcIP" + separatorCharacter + "DstPort" + separatorCharacter + "Proto" + separatorCharacter + "Timestamp"
+	var ts string
+
+	if minimal {
+		ts = strconv.Itoa(int(time.Now().Unix()))
 	} else {
-		header = "SrcIP" + separatorCharacter + "DstPort" + separatorCharacter + "Proto" + separatorCharacter + "Timestamp"
+		ts = "Timestamp"
+	}
+	if portScanMode {
+		header = "SrcIP" + separatorCharacter + "DstPort" + separatorCharacter + "Proto" + separatorCharacter + ts
+	} else {
+		header = "SrcIP" + separatorCharacter + "SrcPort" + separatorCharacter + "DstIP" + separatorCharacter + "DstPort" + separatorCharacter + "Proto" + separatorCharacter + ts
 	}
 	fmt.Println(header)
 }
 
-// Print packet information
+// Print packet information, return true if packet was printed
 func PrintPacketInfo(p *PacketStruct, memoryHashmap map[string]bool, blacklistHashmap map[string]bool, t int64, sep string, minimal bool, portScanMode bool, interfaceAddress string) {
 
 	if p.srcIp != nil { // If packet contains IP addresses
