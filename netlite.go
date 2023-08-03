@@ -3,7 +3,7 @@ package main
 /*
 A very lightweight netflow alternative
 
-Version 1.0.4
+Version 1.0.
 
 */
 import (
@@ -16,17 +16,18 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-func getArgs() (string, bool, bool, string, int, bool, bool, bool, string) {
+func getArgs() (string, bool, bool, string, int, bool, bool, int, bool, string) {
 	// This should handle alternative cache locations..
 	var inputInterface = flag.String("i", "", "network `interface name`")
 	var listDevices = flag.Bool("l", false, "list network interfaces")
 
 	var printHeader = flag.Bool("p", false, "print header")
 	var separatorCharacter = flag.String("s", "\t", "`separator` character")
-	var memoryLifetimeSeconds = flag.Int("r", 600, "reset memory after X `seconds`\nthe memory of seen sockets gets purged and previously seen connections will get logged again.")
+	var memoryLifetimeSeconds = flag.Int("r", 3600, "reset memory after X `seconds`\nthe memory of seen sockets gets purged and previously seen connections will get logged again.")
 
 	var minimal = flag.Bool("m", false, "Show minimal output\n\tTimestamp is printed once in the header (if -p) followed by an increment of seconds for each connection\n\tProtocol is replaced by 0,1,2,3\n\t0=TCP, 1=UDP, 2=ICMP, 3=DNS, 4=NOT_IMPLEMENTED")
 	var portScanMode = flag.Bool("portscan-mode", false, "Show port scans, only show incoming non established traffic\nConnections initiated from your client will not show in output\nIf the interface has several addresses, the first one will get used")
+	var portScanWait = flag.Int("portscan-wait", 240, "Wait x `seconds` before printing output when showing port scans.\nThis is to let the filter populate the already established connections")
 	var verbose = flag.Bool("v", false, "verbose mode")
 	var ipOverride = flag.String("ip-override", "", "If Netlite cant detect interface address, set it here")
 	flag.Parse()
@@ -36,18 +37,18 @@ func getArgs() (string, bool, bool, string, int, bool, bool, bool, string) {
 		os.Exit(1)
 	}
 
-	return *inputInterface, *listDevices, *printHeader, *separatorCharacter, *memoryLifetimeSeconds, *minimal, *portScanMode, *verbose, *ipOverride
+	return *inputInterface, *listDevices, *printHeader, *separatorCharacter, *memoryLifetimeSeconds, *minimal, *portScanMode, *portScanWait, *verbose, *ipOverride
 }
 
 func main() {
-
 	var (
 		snapshotLen int32         = 1500 // Only need header part of the frame
 		promiscuous bool          = false
 		timeout     time.Duration = 100 * time.Millisecond
 	)
 
-	inputInterface, listDevices, printHeader, separatorCharacter, memoryLifetimeSeconds, minimal, portScanMode, verbose, ipOverride := getArgs()
+	inputInterface, listDevices, printHeader, separatorCharacter, memoryLifetimeSeconds, minimal, portScanMode, portScanWait, verbose, ipOverride := getArgs()
+	portScanWaitTimestamp := int(time.Now().Unix()) + portScanWait
 
 	// list devices
 
@@ -89,5 +90,5 @@ func main() {
 	}
 
 	// Start capture
-	tools.StartCapture(inputInterface, snapshotLen, promiscuous, timeout, separatorCharacter, memoryLifetimeSeconds, minimal, portScanMode, interfaceAddress)
+	tools.StartCapture(inputInterface, snapshotLen, promiscuous, timeout, separatorCharacter, memoryLifetimeSeconds, minimal, portScanMode, portScanWaitTimestamp, interfaceAddress)
 }

@@ -68,14 +68,15 @@ func GetPacketInfo(packet gopacket.Packet, p *PacketStruct, minimal bool) {
 	}
 }
 
-func StartCapture(inputInterface string, snapshotLen int32, promiscuous bool, timeout time.Duration, separatorCharacter string, memoryLifetimeSeconds int, minimal bool, portScanMode bool, interfaceAddress string) {
+func StartCapture(inputInterface string, snapshotLen int32, promiscuous bool, timeout time.Duration, separatorCharacter string, memoryLifetimeSeconds int, minimal bool, portScanMode bool, portScanWaitTimestamp int, interfaceAddress string) {
 	// Start time of capture
 	processStartTime := time.Now().Unix()
 
 	// Create memory hashmap
-	memoryHashmap := make(map[string]bool)
-	blacklistHashmap := make(map[string]bool) // For defensive port scan mode
+	memoryHashmap := make(map[uint64]bool)
+	blacklistHashmap := make(map[uint64]bool) // For defensive port scan mode
 	mapInitTime := time.Now().Unix()          // Time when map was last initialized
+	establishedMapInitTime := time.Now().Unix()
 
 	// Create packet struct
 	pStruct := PacketStruct{}
@@ -96,13 +97,17 @@ func StartCapture(inputInterface string, snapshotLen int32, promiscuous bool, ti
 
 		// Clear the map after memoryLifetimeSeconds
 		if timeNow-mapInitTime > int64(memoryLifetimeSeconds) {
-			memoryHashmap = make(map[string]bool)
-			if portScanMode {
-				blacklistHashmap = make(map[string]bool)
-			}
+			memoryHashmap = make(map[uint64]bool)
 			mapInitTime = timeNow // Update the reset timestamp
 		}
 
+		if portScanMode {
+			// Established blacklist has a hardcoded reset time of 1 day (86000 seconds) with an offset of 400 seconds so that memory hashmap and established map does not get emptied at the same time
+			if establishedMapInitTime+86000 < timeNow { // If the time now is more than the start time plus the offset, reset the filter
+				blacklistHashmap = make(map[uint64]bool)
+				establishedMapInitTime = timeNow
+			}
+		}
 		if minimal {
 			if minimalPrintedFirstTimestamp { // If the first packet has outputted full timestamp, then output seconds since start
 				timeNow = time.Now().Unix() - processStartTime
@@ -120,7 +125,7 @@ func StartCapture(inputInterface string, snapshotLen int32, promiscuous bool, ti
 		}
 
 		// Print packet information
-		PrintPacketInfo(&pStruct, memoryHashmap, blacklistHashmap, timeNow, separatorCharacter, minimal, portScanMode, interfaceAddress)
+		PrintPacketInfo(&pStruct, memoryHashmap, blacklistHashmap, timeNow, separatorCharacter, minimal, portScanMode, portScanWaitTimestamp, interfaceAddress)
 	}
 
 }
