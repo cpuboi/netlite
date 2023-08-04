@@ -31,13 +31,13 @@ func PrintPacketInfo(p *PacketStruct, memoryHashmap map[uint64]bool, blacklistHa
 			if portScanMode { // Only show incoming connection attempts
 				if int(time.Now().Unix()) > portScanWaitTimestamp {
 					if !IpIsEstablished(p, blacklistHashmap, interfaceAddress) { // If Destination IP not in blacklist then print line (destination ip gets added to blacklist)
-						if !MiniFilter(p, memoryHashmap) { // This is to prevent logging the same socket over and over
+						if !MiniFilter(p, memoryHashmap, portScanMode) { // This is to prevent logging the same socket over and over
 							fmt.Println(p.srcIp.String() + sep + strconv.Itoa(p.dstPort) + sep + p.proto + sep + strconv.Itoa(int(t)))
 						}
 					}
 				}
 			} else { // If not in Port scan detection mode, print all information
-				if !MiniFilter(p, memoryHashmap) { // If data not in memory print line print line
+				if !MiniFilter(p, memoryHashmap, portScanMode) { // If data not in memory print line print line
 					fmt.Println(p.srcIp.String() + sep + strconv.Itoa(p.srcPort) + sep + p.dstIp.String() + sep + strconv.Itoa(p.dstPort) + sep + p.proto + sep + strconv.Itoa(int(t)))
 				}
 			}

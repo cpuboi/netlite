@@ -22,9 +22,14 @@ A basic packet filter, returns True if packet is to be filtered (discarded)
 		Then returns false
 	If the item already exists it returns true
 */
-func MiniFilter(p *PacketStruct, memoryHashmap map[uint64]bool) bool {
+func MiniFilter(p *PacketStruct, memoryHashmap map[uint64]bool, portScanMode bool) bool {
+	var filterString string
+	if portScanMode {
+		filterString = p.proto + p.srcIp.String() + p.dstIp.String() + strconv.Itoa(p.dstPort) // Dont store source port, this will prevent duplicate logging of many sockets if one server repeatedly spams (or some buggy server on the network sends bad multicasts)
+	} else {
+		filterString = p.proto + p.srcIp.String() + strconv.Itoa(p.srcPort) + p.dstIp.String() + strconv.Itoa(p.dstPort)
+	}
 
-	filterString := p.proto + p.srcIp.String() + strconv.Itoa(p.srcPort) + p.dstIp.String() + strconv.Itoa(p.dstPort)
 	uint64Hash := StringToFnvUint64(filterString)
 	_, exists := memoryHashmap[uint64Hash]
 	if exists {
